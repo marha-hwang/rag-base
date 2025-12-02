@@ -15,9 +15,9 @@ from langchain_weaviate import WeaviateVectorStore
 from langchain_core.documents import Document
 import requests
 
-from backend.constants import WEAVIATE_GENERAL_GUIDES_AND_TUTORIALS_INDEX_NAME
-from backend.embeddings import get_embeddings_model
-from backend.parser import langchain_docs_extractor
+from constants import WEAVIATE_GENERAL_GUIDES_AND_TUTORIALS_INDEX_NAME
+from embeddings import get_embeddings_model
+from parser import langchain_docs_extractor
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -146,7 +146,7 @@ def load_single_url(url: str) -> list[Document]:
     print(metadata)
 
     page_content = langchain_docs_extractor(soup)
-    print(  page_content)
+    print(page_content)
 
     if not page_content:
         logger.warning(f"No content extracted from URL: {url}")
@@ -154,6 +154,16 @@ def load_single_url(url: str) -> list[Document]:
 
     doc = Document(page_content=page_content, metadata=metadata)
     return [doc]
+
+def load_notion_docs(path:str):
+    from langchain_community.document_loaders import NotionDirectoryLoader
+
+    loader = NotionDirectoryLoader(path)
+    documents = loader.load()
+    for document in documents:
+        source = document.metadata["source"]
+        document.metadata["title"] = source
+    return documents
 
 def ingest_docs():
     text_splitter = RecursiveCharacterTextSplitter(chunk_size=4000, chunk_overlap=200)
@@ -170,16 +180,11 @@ def ingest_docs():
             index_name=WEAVIATE_GENERAL_GUIDES_AND_TUTORIALS_INDEX_NAME,
             text_key="text",
             embedding=embedding,
+            # Weaviate에 쿼리 시 반환할 메타데이터 속성 지정, 따라서 Ducument 저장시에 해당 속성이 반드시 포함되어야 함
             attributes=["source", "title"],
         )
 
-        # 중복되는 레코드 관리를 위한 Record Manager 생성
-        # SQLRecordManager 는 Weaviate 와 같은 벡터 스토어와 함께 사용하여 인덱싱된 벡터의 메타데이터 및 상태를 관리합니다.
-        # 이를 통해 중복 인덱싱을 방지하고, 업데이트된 문서만 재인덱싱할 수 있습니다.
-        # 예: 어떤 문서가 이미 인덱싱되었는지 추적
-        # Record Manager 는 벡터 스토어와 별도의 데이터베이스에 문서의 고유 식별자, 인덱싱 상태, 타임스탬프 등의 정보를 관리합니다.
-        # 예: PostgreSQL, SQLite 등
-        # 매번 모든 문서를 임베딩 하는 시간/돈을 절약할 수 있습니다.
+        # 어떤 문서가 이미 벡터 저장소에 저장되었는지 기록하는 역활을 함 (중복 인덱싱 방지)
         record_manager = SQLRecordManager(
             namespace=f"weaviate/{WEAVIATE_GENERAL_GUIDES_AND_TUTORIALS_INDEX_NAME}",
             db_url=RECORD_MANAGER_DB_URL,
@@ -187,7 +192,8 @@ def ingest_docs():
         record_manager.create_schema()
         
         # general_guides_and_tutorials_docs = ingest_general_guides_and_tutorials()
-        general_guides_and_tutorials_docs = load_single_url("https://m.sports.naver.com/kbaseball/article/022/0004086120")
+        #general_guides_and_tutorials_docs = load_single_url("https://m.sports.naver.com/kbaseball/article/022/0004086120")
+        general_guides_and_tutorials_docs = load_notion_docs("/Users/haram/Desktop/카카오부캠/코드/rag-base/test/sample_data/test")
 
         # 문서 분할
         docs_transformed = text_splitter.split_documents(
@@ -198,9 +204,7 @@ def ingest_docs():
             doc for doc in docs_transformed if len(doc.page_content) > 10
         ]
 
-        # We try to return 'source' and 'title' metadata when querying vector store and
-        # Weaviate will error at query time if one of the attributes is missing from a
-        # retrieved document.
+        # weaviate에서 검색을 할 때 metadata의 source, title 필드를 포함하여 반환하도록 설정했으므로 문서에도 해당 필드가 반드시 포함되어야 함
         for doc in docs_transformed:
             if "source" not in doc.metadata:
                 doc.metadata["source"] = ""
@@ -211,6 +215,9 @@ def ingest_docs():
             record_manager,
             general_guides_and_tutorials_vectorstore,
             cleanup="full",
+            # 벡터db의 metadata에 포함된 source 필드를 고유 식별자로 사용, record_manager에서는 group_id컬럼에 식별자를 저장하여 중복 인덱싱 방지
+            # 만약 source_id_key를 사용하지 않는다면 page_content의 해시값이 고유 식별자로 사용됨
+            # 문서가 조금만 바껴도 해시값이 달라지기 때문에 동일 문서임에도 불구하고 중복 인덱싱될 수 있음, 따라서 source와 같은 고유 식별자를 사용하는 것이 좋음
             source_id_key="source",
             force_update=(os.environ.get("FORCE_UPDATE") or "false").lower() == "true",
         )

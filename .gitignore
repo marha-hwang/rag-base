@@ -12,3 +12,5 @@ wheels/
 # secret files
 .env
 */*.ipynb
+test
+test/*.py

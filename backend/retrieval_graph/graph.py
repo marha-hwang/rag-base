@@ -42,13 +42,14 @@ async def create_research_plan(
 
     # 내부에서 |(파이프) LCEL문법을 사용하여 Plan 타입으로 출력하도록 함
     # with_structured_output : return llm | output_parser
+    # 어떻게 동작하지? 프롬프트에서 출력 형식을 지정하는 것인가?
     model = load_chat_model(configuration.query_model).with_structured_output(
         Plan, **structured_output_kwargs
     )
 
     # 프롬프트 메시지 생성
     messages = [
-        {"role": "system", "content": configuration.research_plan_system_prompt}
+        {"role": "system", "content": configuration.plan_system_prompt}
     ] + state.messages
 
     # invoke, ainvoke의 차이 : ainvoke는 비동기 함수, invoke는 동기 함수
@@ -134,7 +135,7 @@ async def respond(
         [
             {
                 "role": "system",
-                "content": configuration.response_system_prompt.format(context=context),
+                "content": configuration.writing_system_prompt.format(context=context),
             },
             *state.messages,
         ]

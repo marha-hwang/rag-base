@@ -44,7 +44,7 @@ async def generate_queries(
         Response, **structured_output_kwargs
     )
     messages = [
-        {"role": "system", "content": configuration.generate_queries_system_prompt},
+        {"role": "system", "content": configuration.query_system_prompt},
         {"role": "human", "content": state.question},
     ]
     response = cast(
