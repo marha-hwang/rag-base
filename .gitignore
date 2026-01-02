@@ -1,16 +1,26 @@
-# Python-generated files
+# General
+.DS_Store
+.vscode/
+
+# Python / Environment
 __pycache__/
-*.py[oc]
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.env
+
+# Distribution / Build
 build/
 dist/
-wheels/
-*.egg-info
+*.egg-info/
 
-# Virtual environments
-.venv
+# Testing / Caches
+.pytest_cache/
+.mypy_cache/
+.coverage
+htmlcov/
 
-# secret files
-.env
-*/*.ipynb
-test
-test/*.py
+# Project Specific
+/images
+/temp_table
