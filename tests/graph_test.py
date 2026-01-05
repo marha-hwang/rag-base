@@ -66,7 +66,6 @@ async def main():
     print("\n[최종 답변]")
     print(final_state.get('answer', '답변을 생성하지 못했습니다.'))
 
-    # 리소스가 정상적으로 닫힐 수 있도록 짧은 대기 시간을 줍니다.
     await asyncio.sleep(0)
 
 if __name__ == "__main__":
